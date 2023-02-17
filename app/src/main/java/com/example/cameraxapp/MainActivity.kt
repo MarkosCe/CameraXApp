@@ -35,8 +35,9 @@ import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
 import java.util.Locale
+import java.util.stream.DoubleStream
 
-typealias ImageListener = (input: InputImage) -> Unit
+typealias LumaListener = (luma: Double) -> Unit
 
 class MainActivity : AppCompatActivity() {
 
@@ -114,10 +115,10 @@ class MainActivity : AppCompatActivity() {
                     val msg = "Photo capture succeeded: ${output.savedUri}"
                     Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
                     Log.d(TAG, msg)
-                    val intent = Intent(this@MainActivity, ImageActivity::class.java)//.apply {
+                    /*val intent = Intent(this@MainActivity, ImageActivity::class.java)//.apply {
                         intent.putExtra("uri", output.savedUri.toString())
                     //}
-                    startActivity(intent)
+                    startActivity(intent)*/
                 }
             }
         )
@@ -145,8 +146,8 @@ class MainActivity : AppCompatActivity() {
             val imageAnalyzer = ImageAnalysis.Builder()
                 .build()
                 .also {
-                    it.setAnalyzer(cameraExecutor, YourImageAnalyzer { input ->
-                        recognitionText(input)
+                    it.setAnalyzer(cameraExecutor, LuminosityAnalyzer { luma ->
+                        Log.d(TAG, "Average luminosity: $luma")
                     })
                 }
 
@@ -241,7 +242,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private class YourImageAnalyzer(private val listener: ImageListener) : ImageAnalysis.Analyzer {
+    /*private class YourImageAnalyzer(private val listener: ImageListener) : ImageAnalysis.Analyzer {
 
         @ExperimentalGetImage
         override fun analyze(imageProxy: ImageProxy) {
@@ -254,9 +255,9 @@ class MainActivity : AppCompatActivity() {
                 imageProxy.close()
             }
         }
-    }
+    }*/
 
-    /*private class LuminosityAnalyzer(private val listener: LumaListener) : ImageAnalysis.Analyzer {
+    private class LuminosityAnalyzer(private val listener: LumaListener) : ImageAnalysis.Analyzer {
 
         private fun ByteBuffer.toByteArray(): ByteArray {
             rewind()    // Rewind the buffer to zero
@@ -276,5 +277,5 @@ class MainActivity : AppCompatActivity() {
 
             image.close()
         }
-    }*/
+    }
 }
