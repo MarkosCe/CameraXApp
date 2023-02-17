@@ -9,7 +9,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.MediaStore
-import androidx.camera.core.ImageCapture
 import androidx.camera.video.Recorder
 import androidx.camera.video.Recording
 import androidx.camera.video.VideoCapture
@@ -19,12 +18,8 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import android.widget.Toast
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.core.Preview
-import androidx.camera.core.CameraSelector
 import android.util.Log
-import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.ImageCaptureException
-import androidx.camera.core.ImageProxy
+import androidx.camera.core.*
 import androidx.camera.video.FallbackStrategy
 import androidx.camera.video.MediaStoreOutputOptions
 import androidx.camera.video.Quality
@@ -32,11 +27,16 @@ import androidx.camera.video.QualitySelector
 import androidx.camera.video.VideoRecordEvent
 import androidx.core.content.PermissionChecker
 import com.example.cameraxapp.databinding.ActivityMainBinding
+import com.google.mlkit.common.MlKitException
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.Text
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-typealias LumaListener = (luma: Double) -> Unit
+typealias ImageListener = (input: InputImage) -> Unit
 
 class MainActivity : AppCompatActivity() {
 
@@ -49,6 +49,10 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var cameraExecutor: ExecutorService
 
+
+    private var needUpdateGraphicOverlayImageSourceInfo = false
+
+    @ExperimentalGetImage
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         viewBinding = ActivityMainBinding.inflate(layoutInflater)
@@ -64,9 +68,14 @@ class MainActivity : AppCompatActivity() {
 
         // Set up the listeners for take photo and video capture buttons
         viewBinding.imageCaptureButton.setOnClickListener { takePhoto() }
-        viewBinding.videoCaptureButton.setOnClickListener { captureVideo() }
+        viewBinding.videoCaptureButton.setOnClickListener { scanner() }
 
         cameraExecutor = Executors.newSingleThreadExecutor()
+    }
+
+    private fun scanner(){
+        val intent = Intent(this@MainActivity, ScannerActivity::class.java)
+        startActivity(intent)
     }
 
     private fun takePhoto() {
@@ -105,9 +114,9 @@ class MainActivity : AppCompatActivity() {
                     val msg = "Photo capture succeeded: ${output.savedUri}"
                     Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
                     Log.d(TAG, msg)
-                    val intent = Intent(this@MainActivity, ImageActivity::class.java).apply {
-                        putExtra("uri", output.savedUri)
-                    }
+                    val intent = Intent(this@MainActivity, ImageActivity::class.java)//.apply {
+                        intent.putExtra("uri", output.savedUri.toString())
+                    //}
                     startActivity(intent)
                 }
             }
@@ -116,6 +125,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun captureVideo() {}
 
+    @ExperimentalGetImage
     private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
 
@@ -135,8 +145,8 @@ class MainActivity : AppCompatActivity() {
             val imageAnalyzer = ImageAnalysis.Builder()
                 .build()
                 .also {
-                    it.setAnalyzer(cameraExecutor, LuminosityAnalyzer { luma ->
-                        Log.d(TAG, "Average luminosity: $luma")
+                    it.setAnalyzer(cameraExecutor, YourImageAnalyzer { input ->
+                        recognitionText(input)
                     })
                 }
 
@@ -156,6 +166,37 @@ class MainActivity : AppCompatActivity() {
             }
 
         }, ContextCompat.getMainExecutor(this))
+    }
+
+    private fun recognitionText(inImage: InputImage) {
+        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+
+        val result = recognizer.process(inImage)
+            .addOnSuccessListener { visionText ->
+                processTextRecognitionResult(visionText);
+            }
+            .addOnFailureListener{ e ->
+                e.printStackTrace();
+            }
+    }
+
+    private fun processTextRecognitionResult(texts: Text) {
+        val blocks: List<Text.TextBlock> = texts.textBlocks
+        if (blocks.isEmpty()) {
+            Toast.makeText(applicationContext, "No text found", Toast.LENGTH_SHORT).show();
+            return
+        }
+        for (i in blocks.indices) {
+            Log.d("BLOCK", "bl: ${blocks[i].text}")
+            viewBinding.textViewMain.text = blocks[i].text
+            val lines: List<Text.Line> = blocks[i].lines
+            for (j in lines.indices) {
+                val elements: List<Text.Element> = lines[j].elements
+                for (k in elements.indices) {
+                    Log.d("ELEMENT", "Word: ${elements[k].text}")
+                }
+            }
+        }
     }
 
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
@@ -183,6 +224,7 @@ class MainActivity : AppCompatActivity() {
             }.toTypedArray()
     }
 
+    @ExperimentalGetImage
     override fun onRequestPermissionsResult(
         requestCode: Int, permissions: Array<String>, grantResults:
         IntArray) {
@@ -199,7 +241,22 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private class LuminosityAnalyzer(private val listener: LumaListener) : ImageAnalysis.Analyzer {
+    private class YourImageAnalyzer(private val listener: ImageListener) : ImageAnalysis.Analyzer {
+
+        @ExperimentalGetImage
+        override fun analyze(imageProxy: ImageProxy) {
+            val mediaImage = imageProxy.image
+            if (mediaImage != null) {
+                val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+
+                listener(image)
+
+                imageProxy.close()
+            }
+        }
+    }
+
+    /*private class LuminosityAnalyzer(private val listener: LumaListener) : ImageAnalysis.Analyzer {
 
         private fun ByteBuffer.toByteArray(): ByteArray {
             rewind()    // Rewind the buffer to zero
@@ -219,5 +276,5 @@ class MainActivity : AppCompatActivity() {
 
             image.close()
         }
-    }
+    }*/
 }

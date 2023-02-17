@@ -23,6 +23,7 @@ class ImageActivity : AppCompatActivity() {
         setContentView(viewBinding.root)
 
         val image = intent.getStringExtra("uri")
+        Log.d("Errore", image.toString())
         val uri = Uri.parse(image)
 
         val imageInput: InputImage = InputImage.fromFilePath(applicationContext, uri)
@@ -49,16 +50,17 @@ class ImageActivity : AppCompatActivity() {
         val texto = ""
         //mGraphicOverlay.clear()
         for (i in blocks.indices) {
-            if (blocks[i].text.contains("NOMBRE")) {
-                Toast.makeText(this, blocks[i].text, Toast.LENGTH_SHORT).show()
+            //if (blocks[i].text.contains("NOMBRE")) {
+                //Toast.makeText(this, blocks[i].text, Toast.LENGTH_SHORT).show()
+                Log.d("BLOCK", "bl: ${blocks[i].text}")
                 viewBinding.textView.text = blocks[i].text
-            }
+            //}
             val lines: List<Text.Line> = blocks[i].lines
             //Toast.makeText(this, blocks.get(i).getText(), Toast.LENGTH_SHORT).show();
             for (j in lines.indices) {
                 val elements: List<Text.Element> = lines[j].elements
                 for (k in elements.indices) {
-                    Log.d("ELEMENT", "Word: ${elements[k]}")
+                    Log.d("ELEMENT", "Word: ${elements[k].text}")
                     /*val textGraphic: GraphicOverlay.Graphic = TextGraphic(
                         mGraphicOverlay,
                         elements[k]

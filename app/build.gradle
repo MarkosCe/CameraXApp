@@ -47,7 +47,7 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
 
     //camera X
-    def camerax_version = "1.2.0"
+    def camerax_version = "1.2.1"
     implementation "androidx.camera:camera-core:${camerax_version}"
     implementation "androidx.camera:camera-camera2:${camerax_version}"
     implementation "androidx.camera:camera-lifecycle:${camerax_version}"
@@ -56,5 +56,9 @@ dependencies {
     implementation "androidx.camera:camera-view:${camerax_version}"
     implementation "androidx.camera:camera-extensions:${camerax_version}"
 
+    //mlkit
     implementation 'com.google.android.gms:play-services-mlkit-text-recognition:18.0.2'
+
+    //scanner
+    implementation 'com.websitebeaver:documentscanner:1.3.4'
 }
