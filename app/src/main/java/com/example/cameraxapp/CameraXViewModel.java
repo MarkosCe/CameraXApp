@@ -1,0 +1,64 @@
+package com.example.cameraxapp;
+
+import android.app.Application;
+import android.util.Log;
+
+import androidx.annotation.NonNull;
+import androidx.camera.lifecycle.ProcessCameraProvider;
+import androidx.core.content.ContextCompat;
+import androidx.lifecycle.AndroidViewModel;
+import androidx.lifecycle.LiveData;
+import androidx.lifecycle.MutableLiveData;
+
+import com.google.common.util.concurrent.ListenableFuture;
+
+import java.util.concurrent.ExecutionException;
+
+public class CameraXViewModel extends AndroidViewModel {
+
+    private static final String TAG = "CameraXViewModel";
+    private MutableLiveData<ProcessCameraProvider> cameraProviderLiveData;
+
+    private Boolean position = false;
+    MutableLiveData<Boolean> position2 = new MutableLiveData<>(false);
+
+    /**
+     * Create an instance which interacts with the camera service via the given application context.
+     */
+    public CameraXViewModel(@NonNull Application application) {
+        super(application);
+    }
+
+    public LiveData<ProcessCameraProvider> getProcessCameraProvider() {
+        if (cameraProviderLiveData == null) {
+            cameraProviderLiveData = new MutableLiveData<>();
+
+            ListenableFuture<ProcessCameraProvider> cameraProviderFuture =
+                    ProcessCameraProvider.getInstance(getApplication());
+            cameraProviderFuture.addListener(
+                    () -> {
+                        try {
+                            cameraProviderLiveData.setValue(cameraProviderFuture.get());
+                        } catch (ExecutionException | InterruptedException e) {
+                            // Handle any errors (including cancellation) here.
+                            Log.e(TAG, "Unhandled exception", e);
+                        }
+                    },
+                    ContextCompat.getMainExecutor(getApplication()));
+        }
+
+        return cameraProviderLiveData;
+    }
+
+    public Boolean getPosition() {
+        return position;
+    }
+
+    public void setPosition(Boolean position) {
+        this.position = position;
+    }
+
+    public LiveData<Boolean> getPosition2() {
+        return position2;
+    }
+}

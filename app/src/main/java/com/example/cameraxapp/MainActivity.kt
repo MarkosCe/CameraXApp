@@ -4,6 +4,7 @@ import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -29,6 +30,8 @@ import androidx.core.content.PermissionChecker
 import com.example.cameraxapp.databinding.ActivityMainBinding
 import com.google.mlkit.common.MlKitException
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.common.internal.MultiFlavorDetectorCreator
+import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -37,7 +40,7 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.stream.DoubleStream
 
-typealias LumaListener = (luma: Double) -> Unit
+//typealias LumaListener = (luma: Double) -> Unit
 
 class MainActivity : AppCompatActivity() {
 
@@ -69,17 +72,27 @@ class MainActivity : AppCompatActivity() {
 
         // Set up the listeners for take photo and video capture buttons
         viewBinding.imageCaptureButton.setOnClickListener { takePhoto() }
-        viewBinding.videoCaptureButton.setOnClickListener { scanner() }
+        viewBinding.videoCaptureButton.setOnClickListener { livePreview() }
 
         cameraExecutor = Executors.newSingleThreadExecutor()
+    }
+
+    private fun livePreview(){
+        val intent = Intent(this@MainActivity, CameraXLivePreviewActivity::class.java)
+        startActivity(intent)
+        finish()
     }
 
     private fun scanner(){
         val intent = Intent(this@MainActivity, ScannerActivity::class.java)
         startActivity(intent)
+        finish()
     }
 
     private fun takePhoto() {
+
+        Log.e("listo","Photo capture succcess")
+
         // Get a stable reference of the modifiable image capture use case
         val imageCapture = imageCapture ?: return
 
@@ -111,14 +124,11 @@ class MainActivity : AppCompatActivity() {
                     Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
                 }
 
-                override fun onImageSaved(output: ImageCapture.OutputFileResults){
+                override fun
+                        onImageSaved(output: ImageCapture.OutputFileResults){
                     val msg = "Photo capture succeeded: ${output.savedUri}"
                     Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
                     Log.d(TAG, msg)
-                    /*val intent = Intent(this@MainActivity, ImageActivity::class.java)//.apply {
-                        intent.putExtra("uri", output.savedUri.toString())
-                    //}
-                    startActivity(intent)*/
                 }
             }
         )
@@ -146,10 +156,19 @@ class MainActivity : AppCompatActivity() {
             val imageAnalyzer = ImageAnalysis.Builder()
                 .build()
                 .also {
-                    it.setAnalyzer(cameraExecutor, LuminosityAnalyzer { luma ->
-                        Log.d(TAG, "Average luminosity: $luma")
-                    })
+                    it.setAnalyzer(cameraExecutor, LuminosityAnalyzer().apply {
+                        setOnLumaListener(object: LuminosityAnalyzer.LumaListener{
+                            @SuppressLint("SetTextI18n")
+                            override fun setOnLumaListener(average: Double, max: Int) {
+                                runOnUiThread{
+                                    viewBinding.tvAverage.text = "Average = ${"%.2f".format(average)}"
+                                    viewBinding.tvMax.text = "Max = $max"
+                                }
+                            }
+                    }) })
                 }
+
+            //FaceMeshDetectorProcessor(this)
 
             // Select back camera as a default
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
@@ -167,37 +186,6 @@ class MainActivity : AppCompatActivity() {
             }
 
         }, ContextCompat.getMainExecutor(this))
-    }
-
-    private fun recognitionText(inImage: InputImage) {
-        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-
-        val result = recognizer.process(inImage)
-            .addOnSuccessListener { visionText ->
-                processTextRecognitionResult(visionText);
-            }
-            .addOnFailureListener{ e ->
-                e.printStackTrace();
-            }
-    }
-
-    private fun processTextRecognitionResult(texts: Text) {
-        val blocks: List<Text.TextBlock> = texts.textBlocks
-        if (blocks.isEmpty()) {
-            Toast.makeText(applicationContext, "No text found", Toast.LENGTH_SHORT).show();
-            return
-        }
-        for (i in blocks.indices) {
-            Log.d("BLOCK", "bl: ${blocks[i].text}")
-            viewBinding.textViewMain.text = blocks[i].text
-            val lines: List<Text.Line> = blocks[i].lines
-            for (j in lines.indices) {
-                val elements: List<Text.Element> = lines[j].elements
-                for (k in elements.indices) {
-                    Log.d("ELEMENT", "Word: ${elements[k].text}")
-                }
-            }
-        }
     }
 
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
@@ -242,22 +230,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /*private class YourImageAnalyzer(private val listener: ImageListener) : ImageAnalysis.Analyzer {
+    /*private class LuminosityAnalyzer(private val listener: LumaListener) : ImageAnalysis.Analyzer {
 
-        @ExperimentalGetImage
-        override fun analyze(imageProxy: ImageProxy) {
-            val mediaImage = imageProxy.image
-            if (mediaImage != null) {
-                val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-
-                listener(image)
-
-                imageProxy.close()
-            }
-        }
-    }*/
-
-    private class LuminosityAnalyzer(private val listener: LumaListener) : ImageAnalysis.Analyzer {
+        private lateinit var mListener: LumaListener
 
         private fun ByteBuffer.toByteArray(): ByteArray {
             rewind()    // Rewind the buffer to zero
@@ -276,6 +251,42 @@ class MainActivity : AppCompatActivity() {
             listener(luma)
 
             image.close()
+        }
+    }*/
+
+    private class LuminosityAnalyzer : ImageAnalysis.Analyzer {
+
+        private lateinit var mListener: LumaListener
+
+        private fun ByteBuffer.toByteArray(): ByteArray {
+            rewind()    // Rewind the buffer to zero
+            val data = ByteArray(remaining())
+            get(data)   // Copy the buffer into a byte array
+            return data // Return the byte array
+        }
+
+        override fun analyze(image: ImageProxy) {
+
+            val buffer = image.planes[0].buffer
+            val data = buffer.toByteArray()
+            val pixels = data.map { it.toInt() and 0xFF }
+            //val luma = pixels.average()
+            val average = pixels.average()
+            val max = pixels.max()
+
+            mListener.setOnLumaListener(average, max)
+
+            //listener(luma)
+
+            image.close()
+        }
+
+        interface LumaListener{
+            fun setOnLumaListener(average:Double, max:Int)
+        }
+
+        fun setOnLumaListener(mListener: LumaListener){
+            this.mListener = mListener;
         }
     }
 }

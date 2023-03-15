@@ -21,6 +21,13 @@
         android:theme="@style/Theme.CameraXApp"
         tools:targetApi="31">
         <activity
+            android:name=".CameraXLivePreviewActivity"
+            android:exported="false">
+            <meta-data
+                android:name="android.app.lib_name"
+                android:value="" />
+        </activity>
+        <activity
             android:name=".ScannerActivity"
             android:exported="false">
             <meta-data
