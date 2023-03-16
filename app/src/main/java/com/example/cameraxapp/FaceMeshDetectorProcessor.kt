@@ -29,7 +29,9 @@ class FaceMeshDetectorProcessor(
 
     private var one: Boolean
 
-
+    private var closeEyes: Boolean
+    private var openEyes: Boolean
+    private var minEyes: Int
 
     @FaceMesh.ContourType
     private val DISPLAY_CONTOURS =
@@ -78,6 +80,9 @@ class FaceMeshDetectorProcessor(
         pointyOval = 0.0f
         suma = 1
         one = false
+        closeEyes = false
+        openEyes = false
+        minEyes = 0
         cont = 0
 
         yMaxTop = Float.MIN_VALUE
@@ -131,20 +136,23 @@ class FaceMeshDetectorProcessor(
         one = false
         val points = getContourPoints(faceMesh)
         for (point in points) {
+            //Log.d("oval",point.index.toString())
             sumzOval += point.position.z
             if (!one){
                 one = true
                 //Log.d("x value", point.position.x.toString())
                 //Log.d("y value", point.position.y.toString())
+                //sumzOval = point.position.z
                 pointxOval = point.position.x
                 pointyOval = point.position.y
             }
 
         }
 
-        if ((sumzOval/points.size) > 58  && (sumzOval/points.size) < 68){
-            if (pointxOval > 220 && pointxOval < 240)
-                if (pointyOval > 170 && pointyOval < 200){
+        Log.d("index",(sumzOval/points.size).toString())
+        if ((sumzOval/points.size) in 50.0..70.0){
+            if (pointxOval in 215.0..245.0)
+                if (pointyOval in 170.0..200.0){
                     addInstruction(graphicOverlay, "Posicion Correcta")
                     //viewmodel.position2.value = true
                     val pointsE = getEyePoints(faceMesh)
@@ -155,10 +163,19 @@ class FaceMeshDetectorProcessor(
                             yMaxBottom = point.position.y
                         }
                     }
-                    if (Math.abs(yMaxTop - yMaxBottom) in 0.0..1.0){
+                    Log.d("apertura",Math.abs(yMaxTop - yMaxBottom).toString())
+                    if (closeEyes && Math.abs(yMaxTop - yMaxBottom) in 0.5..10.0){
                         viewmodel.position2.value = true
+                    }else if (Math.abs(yMaxTop - yMaxBottom) in 1.0..2.0){
+                        closeEyes = true
+                        //viewmodel.position2.value = true
                     }
 
+                }else{
+                    addInstruction(graphicOverlay, "Posicion Incorrecta")
+                }
+            else{
+                addInstruction(graphicOverlay, "Posicion Incorrecta")
                 }
         }else{
             addInstruction(graphicOverlay, "Posicion Incorrecta")
